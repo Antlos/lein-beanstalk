@@ -58,18 +58,15 @@
   (or (-> project :aws :beanstalk :s3-bucket)
       (str "lein-beanstalk." (app-name project))))
 
-(defn- ep [endpoint region_name]
-  {:ep endpoint :region (Region/valueOf region_name)})
-
-(def s3-endpoints
-  {:us-east-1      (ep "s3.amazonaws.com" "US_Standard")
-   :us-west-1      (ep "s3-us-west-1.amazonaws.com" "US_West")
-   :us-west-2      (ep "s3-us-west-2.amazonaws.com" "US_West_2")
-   :eu-west-1      (ep "s3-eu-west-1.amazonaws.com" "EU_Ireland")
-   :ap-southeast-1 (ep "s3-ap-southeast-1.amazonaws.com" "AP_Singapore")
-   :ap-southeast-2 (ep "s3-ap-southeast-2.amazonaws.com" "AP_Sydney")
-   :ap-northeast-1 (ep "s3-ap-northeast-1.amazonaws.com" "AP_Tokyo")
-   :sa-east-1      (ep "s3-sa-east-1.amazonaws.com" "SA_SaoPaulo")})
+(def aws-regions
+  {:us-east-1       "US_Standard"
+   :us-west-1       "US_West"
+   :us-west-2       "US_West_2"
+   :eu-west-1       "EU_Ireland"
+   :ap-southeast-1  "AP_Singapore"
+   :ap-southeast-2  "AP_Sydney"
+   :ap-northeast-1  "AP_Tokyo"
+   :sa-east-1       "SA_SaoPaulo"})
 
 (def beanstalk-endpoints
   {:us-east-1      "elasticbeanstalk.us-east-1.amazonaws.com"
@@ -84,17 +81,19 @@
 (defn project-endpoint [project endpoints]
   (-> project :aws :beanstalk (:region :us-east-1) keyword endpoints))
 
-(defn create-bucket [client bucket region]
+(defn project-region [project]
+  (-> project :aws :beanstalk (:region :us-east-1) keyword aws-regions Region/valueOf))
+
+(defn create-bucket [client bucket]
   (when-not (.doesBucketExist client bucket)
-    (.createBucket client bucket region)))
+    (.createBucket client bucket)))
 
 (defn s3-upload-file [project filepath]
   (let [bucket  (s3-bucket-name project)
-        file    (io/file filepath)
-        ep-desc (project-endpoint project s3-endpoints)]
+        file    (io/file filepath)]
     (doto (AmazonS3Client. (credentials project))
-      (.setEndpoint (:ep ep-desc))
-      (create-bucket bucket (:region ep-desc))
+      (.setRegion (project-region project))
+      (create-bucket bucket)
       (.putObject bucket (.getName file) file))
     (println "Uploaded" (.getName file) "to S3 Bucket")))
 
